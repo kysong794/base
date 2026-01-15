@@ -6,6 +6,7 @@ import SignupPage from './pages/SignupPage';
 import PostListPage from './pages/PostListPage';
 import PostWritePage from './pages/PostWritePage';
 import PostDetailPage from './pages/PostDetailPage';
+import PostEditPage from './pages/PostEditPage';
 import './index.css';
 
 const queryClient = new QueryClient();
@@ -21,6 +22,7 @@ function App() {
             <Route path="signup" element={<SignupPage />} />
             <Route path="posts/new" element={<PostWritePage />} />
             <Route path="posts/:id" element={<PostDetailPage />} />
+            <Route path="posts/:id/edit" element={<PostEditPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

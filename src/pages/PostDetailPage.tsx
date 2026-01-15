@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { deletePost, getPost } from '../api/posts';
 import { useAuthStore } from '../store/useAuthStore';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Trash2, Edit2 } from 'lucide-react';
 
 export default function PostDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -50,13 +50,20 @@ export default function PostDetailPage() {
                     {/* Simple check: if logged in, show delete. Real check on click error */}
                     {user && (
                         <div className="flex gap-2">
+                            <Link
+                                to={`/posts/${post.id}/edit`}
+                                className="flex items-center gap-1 text-gray-600 hover:text-blue-600 px-3 py-1 rounded border border-transparent hover:bg-blue-50 transition"
+                            >
+                                <Edit2 size={16} />
+                                수정
+                            </Link>
                             <button
                                 onClick={() => {
                                     if (confirm('정말 삭제하시겠습니까?')) {
                                         deleteMutation.mutate(post.id);
                                     }
                                 }}
-                                className="flex items-center gap-1 text-red-600 hover:text-red-800 px-3 py-1 rounded"
+                                className="flex items-center gap-1 text-red-600 hover:text-red-800 px-3 py-1 rounded hover:bg-red-50 transition"
                             >
                                 <Trash2 size={16} />
                                 삭제
