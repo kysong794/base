@@ -16,7 +16,16 @@ export default function LoginPage() {
         try {
             const data = await login({ email, password });
             setToken(data.accessToken);
-            setUser({ email }); // In a real app, you might decode the token or fetch user info
+
+            // Decode JWT to get user info
+            const payload = JSON.parse(atob(data.accessToken.split('.')[1]));
+            const role = payload.auth.includes('ADMIN') ? 'ADMIN' : 'USER';
+
+            setUser({
+                email,
+                nickname: email.split('@')[0], // Placeholder nickname from email
+                role
+            });
             navigate('/');
         } catch {
             setError('로그인 실패: 이메일 또는 비밀번호를 확인해주세요.');

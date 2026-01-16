@@ -7,6 +7,8 @@ import PostListPage from './pages/PostListPage';
 import PostWritePage from './pages/PostWritePage';
 import PostDetailPage from './pages/PostDetailPage';
 import PostEditPage from './pages/PostEditPage';
+import AdminPage from './pages/AdminPage';
+import MyPage from './pages/MyPage';
 import './index.css';
 
 const queryClient = new QueryClient();
@@ -16,13 +18,15 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<PostListPage />} />
-            <Route path="login" element={<LoginPage />} />
-            <Route path="signup" element={<SignupPage />} />
-            <Route path="posts/new" element={<PostWritePage />} />
-            <Route path="posts/:id" element={<PostDetailPage />} />
-            <Route path="posts/:id/edit" element={<PostEditPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route element={<Layout />}>
+            <Route path="/" element={<PostListPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/mypage" element={<MyPage />} />
+            <Route path="/posts/new" element={<PostWritePage />} />
+            <Route path="/posts/:id" element={<PostDetailPage />} />
+            <Route path="/posts/:id/edit" element={<PostEditPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

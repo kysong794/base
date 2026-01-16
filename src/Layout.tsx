@@ -26,8 +26,15 @@ export default function Layout() {
                                 <>
                                     <span className="text-gray-700 flex items-center gap-2">
                                         <User size={18} />
-                                        {user?.email}
+                                        <Link to="/mypage" className="hover:text-blue-600 hover:underline">
+                                            {user?.email}
+                                        </Link>
                                     </span>
+                                    {user?.role === 'ADMIN' && (
+                                        <Link to="/admin" className="text-gray-500 hover:text-blue-600 font-medium">
+                                            관리자
+                                        </Link>
+                                    )}
                                     <button
                                         onClick={handleLogout}
                                         className="text-gray-500 hover:text-gray-700 flex items-center gap-1"
