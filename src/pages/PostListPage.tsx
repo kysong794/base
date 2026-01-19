@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getPosts, deletePost, bulkUpdatePostCategory, togglePin } from '../api/posts'; // Added bulk API & togglePin
+import { getPosts, deletePost, bulkUpdatePostCategory, togglePin } from '../api/posts';
 import { getCategories } from '../api/categories';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { format } from 'date-fns';
-import { Loader2, Trash2, Edit2, Shield, FolderInput, Pin, PinOff } from 'lucide-react'; // Added FolderInput, Pin, PinOff icons
+import { Loader2, Trash2, Edit2, Shield, FolderInput, Pin, PinOff } from 'lucide-react';
+import useDraggableScroll from '../hooks/useDraggableScroll';
 
 export default function PostListPage() {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -14,6 +15,9 @@ export default function PostListPage() {
 
     const { user, isAdmin } = useAuthStore();
     const queryClient = useQueryClient();
+
+    // Draggable Scroll
+    const { ref: scrollRef, ...scrollEvents } = useDraggableScroll<HTMLDivElement>();
 
     // Selection State
     const [selectedPosts, setSelectedPosts] = useState<number[]>([]);
@@ -135,7 +139,11 @@ export default function PostListPage() {
             </div>
 
             {/* Category Tabs */}
-            <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
+            <div
+                className={`flex border-b border-gray-200 mb-6 overflow-x-auto ${scrollEvents.isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                ref={scrollRef}
+                {...scrollEvents}
+            >
                 <button
                     className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${!categoryId
                         ? 'border-b-2 border-blue-600 text-blue-600'

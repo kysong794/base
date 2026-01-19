@@ -1,17 +1,24 @@
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCategories, createCategory, deleteCategory, migrateCategory } from '../api/categories';
 import { getMembers, updateMemberRole } from '../api/members';
-import { getDashboardStatistics } from '../api/statistics';
-import { Loader2, Trash2, Plus, ArrowRight, Users, FolderTree, Shield, User, BarChart as ChartIcon } from 'lucide-react';
-import { format } from 'date-fns';
+import { getCategories, createCategory, deleteCategory, reorderCategories, migrateCategoryPosts } from '../api/categories';
+import { getStats } from '../api/statistics';
+import { getMyTasks, createTask, deleteTask, moveTask } from '../api/tasks';
+import type { TaskStatus } from '../api/tasks';
+import useDraggableScroll from '../hooks/useDraggableScroll';
 import { useAuthStore } from '../store/useAuthStore';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { User, Shield, Loader2, GripVertical, Trash2, Plus, ArrowRight, LayoutDashboard, Users, Kanban, FolderTree } from 'lucide-react';
+import { format } from 'date-fns';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LineChart, Line, CartesianGrid } from 'recharts';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
-type Tab = 'dashboard' | 'categories' | 'users';
+type Tab = 'dashboard' | 'categories' | 'users' | 'kanban';
 
 export default function AdminPage() {
     const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+    // Draggable Scroll
+    const { ref: userTableRef, ...userTableEvents } = useDraggableScroll<HTMLDivElement>();
 
     // Category State
     const [newCategory, setNewCategory] = useState('');
@@ -35,7 +42,7 @@ export default function AdminPage() {
 
     const { data: stats, isLoading: isStatsLoading } = useQuery({
         queryKey: ['admin-stats'],
-        queryFn: getDashboardStatistics,
+        queryFn: getStats,
         enabled: activeTab === 'dashboard',
     });
 
@@ -63,7 +70,7 @@ export default function AdminPage() {
     });
 
     const migrateMutation = useMutation({
-        mutationFn: migrateCategory,
+        mutationFn: migrateCategoryPosts,
         onSuccess: () => {
             alert('게시글 이동이 완료되었습니다.');
             setMigrationFrom('');
@@ -71,6 +78,16 @@ export default function AdminPage() {
         },
         onError: () => {
             alert('게시글 이동 중 오류가 발생했습니다.');
+        }
+    });
+
+    const reorderMutation = useMutation({
+        mutationFn: reorderCategories,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
+        },
+        onError: () => {
+            alert('순서 변경 중 오류가 발생했습니다.');
         }
     });
 
@@ -109,9 +126,101 @@ export default function AdminPage() {
 
     const handleRoleChange = (memberId: number, currentRole: 'USER' | 'ADMIN') => {
         const newRole = currentRole === 'ADMIN' ? 'USER' : 'ADMIN';
-        if (window.confirm(`해당 사용자의 권한을 ${newRole}로 변경하시겠습니까?`)) {
+        if (window.confirm(`해당 사용자의 권한을 ${newRole}로 변경하시겠습니까 ? `)) {
             updateRoleMutation.mutate({ id: memberId, role: newRole });
         }
+    };
+
+
+    // Dashboard Layout State
+    const defaultWidgets = ['stat-post', 'stat-member', 'chart-post', 'chart-member'];
+    const [dashboardLayout, setDashboardLayout] = useState<string[]>(() => {
+        const saved = localStorage.getItem('dashboard-layout');
+        return saved ? JSON.parse(saved) : defaultWidgets;
+    });
+
+    const handleDashboardDragEnd = (result: any) => {
+        if (!result.destination) return;
+        const items = Array.from(dashboardLayout);
+        const [reorderedItem] = items.splice(result.source.index, 1);
+        items.splice(result.destination.index, 0, reorderedItem);
+        setDashboardLayout(items);
+        localStorage.setItem('dashboard-layout', JSON.stringify(items));
+    };
+
+    const renderWidget = (widgetId: string) => {
+        switch (widgetId) {
+            case 'stat-post':
+                return (
+                    <div className="bg-blue-50 p-6 rounded-lg border border-blue-100 h-full">
+                        <h3 className="text-gray-500 text-sm font-medium mb-2">총 게시글 수</h3>
+                        <p className="text-3xl font-bold text-gray-900">{stats?.totalPosts.toLocaleString()}</p>
+                    </div>
+                );
+            case 'stat-member':
+                return (
+                    <div className="bg-green-50 p-6 rounded-lg border border-green-100 h-full">
+                        <h3 className="text-gray-500 text-sm font-medium mb-2">총 회원 수</h3>
+                        <p className="text-3xl font-bold text-gray-900">{stats?.totalMembers.toLocaleString()}</p>
+                    </div>
+                );
+            case 'chart-post':
+                return (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm h-full">
+                        <h3 className="text-lg font-semibold mb-4 text-center">일별 게시글 작성 추이 (최근 30일)</h3>
+                        <div className="h-64">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={stats?.dailyPostCounts}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                                    <YAxis allowDecimals={false} />
+                                    <Tooltip />
+                                    <Legend />
+                                    <Bar dataKey="count" name="게시글 수" fill="#3b82f6" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                );
+            case 'chart-member':
+                return (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm h-full">
+                        <h3 className="text-lg font-semibold mb-4 text-center">일별 신규 가입자 추이 (최근 30일)</h3>
+                        <div className="h-64">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={stats?.dailyMemberCounts}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                                    <YAxis allowDecimals={false} />
+                                    <Tooltip />
+                                    <Legend />
+                                    <Line type="monotone" dataKey="count" name="가입자 수" stroke="#10b981" strokeWidth={2} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                );
+            default:
+                return null;
+        }
+    };
+
+    const getWidgetClass = (_widgetId: string) => {
+        return "h-full";
+    };
+
+    const handleDragEnd = (result: any) => {
+        if (!result.destination) return;
+
+        const items = Array.from(categories || []);
+        const [reorderedItem] = items.splice(result.source.index, 1);
+        items.splice(result.destination.index, 0, reorderedItem);
+
+        // Optimistic update
+        queryClient.setQueryData(['categories'], items);
+
+        // API call
+        reorderMutation.mutate(items.map(c => c.id));
     };
 
     if (isCategoriesLoading) {
@@ -133,9 +242,9 @@ export default function AdminPage() {
                     className={`px-4 py-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'dashboard'
                         ? 'border-b-2 border-blue-600 text-blue-600'
                         : 'text-gray-500 hover:text-gray-700'
-                        }`}
+                        } `}
                 >
-                    <ChartIcon size={18} />
+                    <LayoutDashboard size={18} />
                     대시보드
                 </button>
                 <button
@@ -143,7 +252,7 @@ export default function AdminPage() {
                     className={`px-4 py-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'categories'
                         ? 'border-b-2 border-blue-600 text-blue-600'
                         : 'text-gray-500 hover:text-gray-700'
-                        }`}
+                        } `}
                 >
                     <FolderTree size={18} />
                     카테고리 관리
@@ -153,12 +262,25 @@ export default function AdminPage() {
                     className={`px-4 py-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'users'
                         ? 'border-b-2 border-blue-600 text-blue-600'
                         : 'text-gray-500 hover:text-gray-700'
-                        }`}
+                        } `}
                 >
                     <Users size={18} />
                     회원 관리
                 </button>
+                <button
+                    onClick={() => setActiveTab('kanban')}
+                    className={`px-4 py-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'kanban'
+                        ? 'border-b-2 border-blue-600 text-blue-600'
+                        : 'text-gray-500 hover:text-gray-700'
+                        } `}
+                >
+                    <Kanban size={18} />
+                    칸반 보드
+                </button>
             </div>
+
+
+
 
             {/* Content */}
             {activeTab === 'dashboard' ? (
@@ -168,53 +290,45 @@ export default function AdminPage() {
                             <Loader2 className="animate-spin text-blue-600" size={32} />
                         </div>
                     ) : (
-                        <div className="space-y-8">
-                            {/* Summary Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-blue-50 p-6 rounded-lg border border-blue-100">
-                                    <h3 className="text-gray-500 text-sm font-medium mb-2">총 게시글 수</h3>
-                                    <p className="text-3xl font-bold text-gray-900">{stats?.totalPosts.toLocaleString()}</p>
-                                </div>
-                                <div className="bg-green-50 p-6 rounded-lg border border-green-100">
-                                    <h3 className="text-gray-500 text-sm font-medium mb-2">총 회원 수</h3>
-                                    <p className="text-3xl font-bold text-gray-900">{stats?.totalMembers.toLocaleString()}</p>
-                                </div>
-                            </div>
-
-                            {/* Charts */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                                    <h3 className="text-lg font-semibold mb-4 text-center">일별 게시글 작성 추이 (최근 30일)</h3>
-                                    <div className="h-64">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={stats?.dailyPostCounts}>
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                                                <YAxis allowDecimals={false} />
-                                                <Tooltip />
-                                                <Legend />
-                                                <Bar dataKey="count" name="게시글 수" fill="#3b82f6" />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                                    <h3 className="text-lg font-semibold mb-4 text-center">일별 신규 가입자 추이 (최근 30일)</h3>
-                                    <div className="h-64">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={stats?.dailyMemberCounts}>
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                                                <YAxis allowDecimals={false} />
-                                                <Tooltip />
-                                                <Legend />
-                                                <Line type="monotone" dataKey="count" name="가입자 수" stroke="#10b981" strokeWidth={2} />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </div>
-                            </div>
+                        <div>
+                            <p className="text-sm text-gray-500 mb-4 bg-gray-50 p-2 rounded">
+                                <GripVertical className="inline align-middle mr-1" size={16} />
+                                위젯을 드래그하여 순서를 변경할 수 있습니다. (설정은 브라우저에 저장됩니다)
+                            </p>
+                            <DragDropContext onDragEnd={handleDashboardDragEnd}>
+                                <Droppable droppableId="dashboard" direction="horizontal">
+                                    {(provided) => (
+                                        <div
+                                            {...provided.droppableProps}
+                                            ref={provided.innerRef}
+                                            className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                                        >
+                                            {dashboardLayout.map((widgetId, index) => (
+                                                <Draggable key={widgetId} draggableId={widgetId} index={index}>
+                                                    {(provided) => (
+                                                        <div
+                                                            ref={provided.innerRef}
+                                                            {...provided.draggableProps}
+                                                            className={getWidgetClass(widgetId)}
+                                                        >
+                                                            <div className="h-full relative group">
+                                                                <div
+                                                                    {...provided.dragHandleProps}
+                                                                    className="absolute top-2 right-2 text-gray-300 hover:text-gray-500 z-10 p-1 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                >
+                                                                    <GripVertical size={20} />
+                                                                </div>
+                                                                {renderWidget(widgetId)}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </Draggable>
+                                            ))}
+                                            {provided.placeholder}
+                                        </div>
+                                    )}
+                                </Droppable>
+                            </DragDropContext>
                         </div>
                     )}
                 </div>
@@ -285,31 +399,59 @@ export default function AdminPage() {
                         </div>
                     </div>
 
-                    {/* 카테고리 목록 */}
+                    {/* 카테고리 목록 (Drag & Drop) */}
                     <div>
                         <h2 className="text-lg font-semibold mb-3">카테고리 목록</h2>
-                        <div className="space-y-2">
-                            {categories?.map((category) => (
-                                <div
-                                    key={category.id}
-                                    className="flex justify-between items-center p-3 bg-gray-50 rounded-md border border-gray-100"
-                                >
-                                    <span className="font-medium text-gray-700">{category.name}</span>
-                                    <button
-                                        onClick={() => {
-                                            if (window.confirm(`${category.name} 카테고리를 삭제하시겠습니까?`)) {
-                                                deleteMutation.mutate(category.id);
-                                            }
-                                        }}
-                                        className="text-red-500 hover:text-red-700 p-1"
+                        <p className="text-sm text-gray-500 mb-3">
+                            <GripVertical className="inline align-middle mr-1" size={16} />
+                            아이콘을 잡고 드래그하여 순서를 변경할 수 있습니다.
+                        </p>
+                        <DragDropContext onDragEnd={handleDragEnd}>
+                            <Droppable droppableId="categories">
+                                {(provided) => (
+                                    <div
+                                        {...provided.droppableProps}
+                                        ref={provided.innerRef}
+                                        className="space-y-2"
                                     >
-                                        <Trash2 size={18} />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
+                                        {categories?.map((category, index) => (
+                                            <Draggable key={category.id} draggableId={String(category.id)} index={index}>
+                                                {(provided) => (
+                                                    <div
+                                                        ref={provided.innerRef}
+                                                        {...provided.draggableProps}
+                                                        className="flex justify-between items-center p-3 bg-gray-50 rounded-md border border-gray-100 group hover:border-blue-300 transition-colors"
+                                                    >
+                                                        <div className="flex items-center gap-3 flex-1">
+                                                            <div {...provided.dragHandleProps} className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
+                                                                <GripVertical size={20} />
+                                                            </div>
+                                                            <span className="font-medium text-gray-700">{category.name}</span>
+                                                        </div>
+
+                                                        <button
+                                                            onClick={() => {
+                                                                if (window.confirm(`${category.name} 카테고리를 삭제하시겠습니까 ? `)) {
+                                                                    deleteMutation.mutate(category.id);
+                                                                }
+                                                            }}
+                                                            className="text-red-500 hover:text-red-700 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        >
+                                                            <Trash2 size={18} />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </Draggable>
+                                        ))}
+                                        {provided.placeholder}
+                                    </div>
+                                )}
+                            </Droppable>
+                        </DragDropContext>
                     </div>
                 </div>
+            ) : activeTab === 'kanban' ? (
+                <KanbanBoard />
             ) : (
                 // Users Management Tab
                 <div>
@@ -318,7 +460,11 @@ export default function AdminPage() {
                             <Loader2 className="animate-spin text-blue-600" size={32} />
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
+                        <div
+                            className={`overflow-x-auto ${userTableEvents.isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                            ref={userTableRef}
+                            {...userTableEvents}
+                        >
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
@@ -338,7 +484,7 @@ export default function AdminPage() {
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.nickname}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${member.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
-                                                    }`}>
+                                                    } `}>
                                                     {member.role}
                                                 </span>
                                             </td>
@@ -376,3 +522,134 @@ export default function AdminPage() {
         </div>
     );
 }
+
+// Kanban Board Component
+
+const KanbanBoard = () => {
+    const queryClient = useQueryClient();
+    const { data: tasks, isLoading } = useQuery({
+        queryKey: ['tasks'],
+        queryFn: getMyTasks
+    });
+
+    const createMutation = useMutation({
+        mutationFn: createTask,
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: deleteTask,
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    });
+
+    const moveMutation = useMutation({
+        mutationFn: ({ id, data }: { id: number, data: { status: TaskStatus; displayOrder: number } }) =>
+            moveTask(id, data),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    });
+
+    // Optimistic Update for DnD
+    const onDragEnd = (result: any) => {
+        const { destination, source, draggableId } = result;
+
+        if (!destination) return;
+        if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+        const taskId = Number(draggableId);
+        const newStatus = destination.droppableId as TaskStatus;
+        // In a real app, calculate exact new displayOrder based on surrounding items.
+        // For simplicity, we just assign a high number or we need list access to re-index.
+        // Let's implement simple optimistic rendering later, for now just API call.
+
+        moveMutation.mutate({
+            id: taskId,
+            data: {
+                status: newStatus,
+                displayOrder: destination.index + 1 // Simply using index + 1
+            }
+        });
+    };
+
+    const [newItemContent, setNewItemContent] = useState('');
+    const handleCreate = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newItemContent.trim()) return;
+        createMutation.mutate({ content: newItemContent, status: 'TODO' });
+        setNewItemContent('');
+    };
+
+    if (isLoading) return <div className="p-8 text-center"><Loader2 className="animate-spin inline text-blue-600" /></div>;
+
+    const columns: { id: TaskStatus; title: string; bg: string }[] = [
+        { id: 'TODO', title: '할 일', bg: 'bg-gray-100' },
+        { id: 'IN_PROGRESS', title: '진행 중', bg: 'bg-blue-50' },
+        { id: 'DONE', title: '완료', bg: 'bg-green-50' },
+    ];
+
+    const getTasksByStatus = (status: TaskStatus) => {
+        return tasks?.filter(t => t.status === status).sort((a, b) => a.displayOrder - b.displayOrder) || [];
+    };
+
+    return (
+        <div className="space-y-6">
+            <form onSubmit={handleCreate} className="flex gap-2">
+                <input
+                    type="text"
+                    value={newItemContent}
+                    onChange={(e) => setNewItemContent(e.target.value)}
+                    placeholder="새로운 할 일을 입력하세요"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button type="submit" disabled={createMutation.isPending} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50">
+                    추가
+                </button>
+            </form>
+
+            <DragDropContext onDragEnd={onDragEnd}>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {columns.map(col => (
+                        <div key={col.id} className={`p-4 rounded-lg ${col.bg} min-h-[300px]`}>
+                            <h3 className="font-semibold mb-3 text-gray-700 flex justify-between">
+                                {col.title}
+                                <span className="bg-white px-2 py-0.5 rounded text-sm text-gray-500 border border-gray-200">
+                                    {getTasksByStatus(col.id).length}
+                                </span>
+                            </h3>
+                            <Droppable droppableId={col.id}>
+                                {(provided) => (
+                                    <div
+                                        {...provided.droppableProps}
+                                        ref={provided.innerRef}
+                                        className="space-y-3 min-h-[200px]"
+                                    >
+                                        {getTasksByStatus(col.id).map((task, index) => (
+                                            <Draggable key={task.id} draggableId={String(task.id)} index={index}>
+                                                {(provided) => (
+                                                    <div
+                                                        ref={provided.innerRef}
+                                                        {...provided.draggableProps}
+                                                        {...provided.dragHandleProps}
+                                                        className="bg-white p-3 rounded shadow-sm border border-gray-200 hover:shadow-md transition-shadow group relative"
+                                                    >
+                                                        <p className="text-gray-800 pr-6">{task.content}</p>
+                                                        <button
+                                                            onClick={() => deleteMutation.mutate(task.id)}
+                                                            className="absolute top-2 right-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </Draggable>
+                                        ))}
+                                        {provided.placeholder}
+                                    </div>
+                                )}
+                            </Droppable>
+                        </div>
+                    ))}
+                </div>
+            </DragDropContext>
+        </div>
+    );
+};

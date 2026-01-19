@@ -12,7 +12,7 @@ export interface DashboardResponse {
     dailyMemberCounts: DailyCount[];
 }
 
-export const getDashboardStatistics = async () => {
+export const getStats = async () => {
     const response = await client.get<DashboardResponse>('/admin/statistics/dashboard');
     return response.data;
 };
