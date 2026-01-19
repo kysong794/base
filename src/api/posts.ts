@@ -1,9 +1,10 @@
 import client from './client';
 import type { CreatePostRequest, PageResponse, Post, UpdatePostRequest } from '../types/post';
 
-export const getPosts = async (page = 0, size = 10, categoryId?: number) => {
+export const getPosts = async (page = 0, size = 10, categoryId?: number, keyword?: string) => {
     const params: any = { page, size };
     if (categoryId) params.categoryId = categoryId;
+    if (keyword) params.keyword = keyword;
 
     const response = await client.get<PageResponse<Post>>('/posts', { params });
     return response.data;

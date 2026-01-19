@@ -5,7 +5,7 @@ import { getCategories } from '../api/categories';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { format } from 'date-fns';
-import { Loader2, Trash2, Edit2, Shield, FolderInput, Pin, PinOff } from 'lucide-react';
+import { Trash2, Edit2, Shield, FolderInput, Pin, PinOff } from 'lucide-react';
 import useDraggableScroll from '../hooks/useDraggableScroll';
 
 export default function PostListPage() {
@@ -24,16 +24,34 @@ export default function PostListPage() {
     const [isMoveMode, setIsMoveMode] = useState(false);
     const [targetCategoryId, setTargetCategoryId] = useState<number | ''>('');
 
-    const { data: postsData, isLoading: isPostsLoading } = useQuery({
-        queryKey: ['posts', page, categoryId],
-        queryFn: () => getPosts(page, 10, categoryId),
+    // Search State
+    const [keyword, setKeyword] = useState(searchParams.get('keyword') || '');
+    const [searchQuery, setSearchQuery] = useState(searchParams.get('keyword') || '');
+
+    const { data: postsData } = useQuery({
+        queryKey: ['posts', page, categoryId, searchQuery],
+        queryFn: () => getPosts(page, 10, categoryId, searchQuery),
     });
+
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        setSearchQuery(keyword);
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            if (keyword) {
+                newParams.set('keyword', keyword);
+            } else {
+                newParams.delete('keyword');
+            }
+            newParams.set('page', '0'); // Reset page on search
+            return newParams;
+        });
+    };
 
     const { data: categories } = useQuery({
         queryKey: ['categories'],
         queryFn: getCategories,
     });
-
     const deleteMutation = useMutation({
         mutationFn: deletePost,
         onSuccess: () => {
@@ -113,19 +131,25 @@ export default function PostListPage() {
         }
     };
 
-    if (isPostsLoading) {
-        return (
-            <div className="flex justify-center items-center h-64">
-                <Loader2 className="animate-spin text-blue-600" size={32} />
-            </div>
-        );
-    }
-
+    // ... inside return ...
     return (
         <div className="max-w-4xl mx-auto p-4">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold">게시글 목록</h1>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                    <form onSubmit={handleSearch} className="flex gap-2 mr-4">
+                        <input
+                            type="text"
+                            value={keyword}
+                            onChange={(e) => setKeyword(e.target.value)}
+                            placeholder="검색어 입력..."
+                            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button type="submit" className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md text-sm hover:bg-gray-200">
+                            검색
+                        </button>
+                    </form>
+
                     {isAdmin() && (
                         <Link to="/admin" className="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-900 flex items-center gap-2">
                             <Shield size={18} />
