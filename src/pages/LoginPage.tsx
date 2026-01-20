@@ -34,42 +34,55 @@ export default function LoginPage() {
 
     return (
         <div className="flex flex-col items-center justify-center min-h-[80vh]">
-            <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
-                <h2 className="text-2xl font-bold text-center mb-6">로그인</h2>
-                {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-                <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="w-full max-w-md p-8 glass rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.5)] border border-white/10">
+                <h2 className="text-3xl font-bold text-center mb-8 text-white tracking-widest drop-shadow-[0_0_10px_rgba(102,252,241,0.5)]">
+                    BASE<span className="text-cyan">//</span>BOARD
+                </h2>
+
+                <h3 className="text-xl font-bold text-center mb-6 text-gray-300">시스템 접속</h3>
+
+                {error && (
+                    <div className="bg-red-500/10 border border-red-500/30 text-red-500 text-sm p-4 rounded mb-6 font-bold text-center">
+                        {error}
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">이메일</label>
+                        <label className="block text-xs font-bold text-cyan-dim mb-2 uppercase tracking-wider">이메일</label>
                         <input
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-4 py-3 input-cyber rounded-lg"
+                            placeholder="이메일을 입력하세요"
                             required
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">비밀번호</label>
+                        <label className="block text-xs font-bold text-cyan-dim mb-2 uppercase tracking-wider">비밀번호</label>
                         <input
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-4 py-3 input-cyber rounded-lg"
+                            placeholder="비밀번호를 입력하세요"
                             required
                         />
                     </div>
                     <button
                         type="submit"
-                        className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        className="btn-cyber-primary w-full py-3 rounded-lg font-bold tracking-widest shadow-lg text-sm"
                     >
                         로그인
                     </button>
+
+                    <div className="text-center pt-2">
+                        <Link to="/signup" className="text-sm text-gray-500 hover:text-cyan transition-colors">
+                            계정이 없으신가요? <span className="underline decoration-cyan/30">회원가입</span>
+                        </Link>
+                    </div>
                 </form>
-                <div className="mt-4 text-center">
-                    <Link to="/signup" className="text-sm text-blue-600 hover:text-blue-500">
-                        계정이 없으신가요? 회원가입
-                    </Link>
-                </div>
             </div>
         </div>
     );

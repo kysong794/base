@@ -1,3 +1,58 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-void text-muted antialiased;
+  }
+}
+
+/* Glassmorphism Utilities */
+.glass {
+  @apply bg-surface/70 backdrop-blur-md border border-gn/30 relative overflow-hidden;
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.1);
+}
+
+/* Scanline Effect Removed per user request */
+
+.input-cyber {
+  @apply bg-void border border-gn-dim/50 text-white placeholder-gray-600 focus:border-gn focus:ring-1 focus:ring-gn transition-all font-mono tracking-wider;
+}
+
+.btn-cyber {
+  @apply bg-gn-dim/10 text-gn border border-gn/50 hover:bg-gn/20 transition-all font-bold tracking-widest uppercase;
+}
+
+.btn-cyber:hover {
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
+.btn-cyber-primary {
+  @apply bg-gn text-void font-bold hover:bg-[#0ea5e9] transition-all tracking-widest uppercase relative overflow-hidden;
+}
+
+.btn-cyber-primary:hover {
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #0284c7;
+  border-radius: 4px;
+  border: none;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
